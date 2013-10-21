@@ -73,9 +73,12 @@ func (server *RoombaServer) acquireConnection(port_name string) (conn Connection
         conn.Roomba = MakeDummyRoomba()
     } else {
         conn.Roomba, err = roomba.MakeRoomba(port_name)
-        return
+        if err != nil {
+            return
+        }
     }
-    conn.Roomba.Start()
+	conn.Roomba.Start()
+	conn.Roomba.Safe()
 	conn.Port = Port{Name: port_name, State: PORT_STATE_IN_USE}
 
 	server.Connections[conn.Id] = conn

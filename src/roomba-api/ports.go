@@ -101,7 +101,7 @@ func (server *RoombaServer) DeleteConnection(w *rest.ResponseWriter, r *rest.Req
 	// race condition here
 	_, ok := server.Connections[conn_id]
 	if !ok {
-		Error(w, "not found", http.StatusNotFound)
+		Error(w, "connection id %d not found", http.StatusNotFound)
 		return
 	}
 
