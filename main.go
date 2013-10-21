@@ -1,9 +1,9 @@
 package main
 
 import (
+	"fmt"
 	"github.com/ant0ine/go-json-rest"
 	"net/http"
-	"fmt"
 	"roomba-api"
 )
 

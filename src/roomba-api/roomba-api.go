@@ -4,9 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"github.com/ant0ine/go-json-rest"
-//    "net/http"
+	//    "net/http"
 	"log"
-    "roomba"
+	"roomba"
 )
 
 //const (
@@ -42,9 +42,9 @@ func Error(w *rest.ResponseWriter, error string, code int) {
 }
 
 type Connection struct {
-	Id   uint64
-	Port Port
-    Roomba *roomba.Roomba
+	Id     uint64
+	Port   Port
+	Roomba *roomba.Roomba
 }
 
 type RoombaServer struct {
@@ -60,7 +60,7 @@ func (server *RoombaServer) acquireConnection(port_name string) (conn Connection
 
 	if ok {
 		err = errors.New("port is already in use: " + port_name)
-        return
+		return
 	}
 
 	if port_name != DUMMY_PORT_NAME {
@@ -69,14 +69,14 @@ func (server *RoombaServer) acquireConnection(port_name string) (conn Connection
 
 	conn.Id = server.nextConnId
 	server.nextConnId++
-    if port_name == DUMMY_PORT_NAME {
-        conn.Roomba = MakeDummyRoomba()
-    } else {
-        conn.Roomba, err = roomba.MakeRoomba(port_name)
-        if err != nil {
-            return
-        }
-    }
+	if port_name == DUMMY_PORT_NAME {
+		conn.Roomba = MakeDummyRoomba()
+	} else {
+		conn.Roomba, err = roomba.MakeRoomba(port_name)
+		if err != nil {
+			return
+		}
+	}
 	conn.Roomba.Start()
 	conn.Roomba.Safe()
 	conn.Port = Port{Name: port_name, State: PORT_STATE_IN_USE}
@@ -121,20 +121,20 @@ func (server *RoombaServer) manageConnections() {
 		select {
 		case req = <-server.connectionsChan:
 			if req.PortName != "" {
-                log.Printf("Acquiring connection to " + req.PortName)
+				log.Printf("Acquiring connection to " + req.PortName)
 				conn, err := server.acquireConnection(req.PortName)
 				if err != nil {
-                    log.Println("Acquiring connection to " + req.PortName +
-                               "failed: " + err.Error())
+					log.Println("Acquiring connection to " + req.PortName +
+						"failed: " + err.Error())
 
 					resp.Error = err
 				} else {
-                    log.Printf("Acquiring connection to " + req.PortName +
-                               " success: %d", conn.Id)
+					log.Printf("Acquiring connection to "+req.PortName+
+						" success: %d", conn.Id)
 					resp.ConnectionId = conn.Id
 				}
 			} else if req.ConnectionId != 0 {
-                log.Printf("Releasing connection %d", req.ConnectionId)
+				log.Printf("Releasing connection %d", req.ConnectionId)
 				resp.Error = server.releaseConnection(req.ConnectionId)
 			} else {
 				resp.Error = errors.New(
@@ -147,7 +147,7 @@ func (server *RoombaServer) manageConnections() {
 
 func (server *RoombaServer) GetConnection(port_name string) (uint64, error) {
 	resp_chan := make(chan ConnectionResponse)
-    log.Printf("Requesting connection to %s", port_name)
+	log.Printf("Requesting connection to %s", port_name)
 	req := ConnectionRequest{PortName: port_name, C: resp_chan}
 	server.connectionsChan <- req
 	resp := <-resp_chan
@@ -156,7 +156,7 @@ func (server *RoombaServer) GetConnection(port_name string) (uint64, error) {
 
 func (server *RoombaServer) CloseConnection(conn_id uint64) error {
 	resp_chan := make(chan ConnectionResponse)
-    log.Printf("Closing connection %d", conn_id)
+	log.Printf("Closing connection %d", conn_id)
 	req := ConnectionRequest{ConnectionId: conn_id, C: resp_chan}
 	server.connectionsChan <- req
 	resp := <-resp_chan
@@ -173,21 +173,20 @@ func MakeServer() (s RoombaServer) {
 }
 
 func MakeHttpHandlerForServer(server RoombaServer) rest.ResourceHandler {
-    handler := rest.ResourceHandler{
-        EnableRelaxedContentType: true,
-    }
-    handler.SetRoutes(
-        rest.RouteObjectMethod("GET", "/ports", &server, "GetPorts"),
-        rest.RouteObjectMethod("POST", "/ports/*name", &server, "PostPorts"),
-        rest.RouteObjectMethod("DELETE", "/connection/:conn_id", &server, "DeleteConnection"),
-        rest.RouteObjectMethod("PUT", "/connection/:conn_id/control/drive", 
-                               &server, "PutDrive"),
-    )
-    return handler
+	handler := rest.ResourceHandler{
+		EnableRelaxedContentType: true,
+	}
+	handler.SetRoutes(
+		rest.RouteObjectMethod("GET", "/ports", &server, "GetPorts"),
+		rest.RouteObjectMethod("POST", "/ports/*name", &server, "PostPorts"),
+		rest.RouteObjectMethod("DELETE", "/connection/:conn_id", &server, "DeleteConnection"),
+		rest.RouteObjectMethod("PUT", "/connection/:conn_id/control/drive",
+			&server, "PutDrive"),
+	)
+	return handler
 }
 
 func MakeHttpHandler() rest.ResourceHandler {
-    server := MakeServer()
-    return MakeHttpHandlerForServer(server)
+	server := MakeServer()
+	return MakeHttpHandlerForServer(server)
 }
-
