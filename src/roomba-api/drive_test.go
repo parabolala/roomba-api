@@ -40,7 +40,7 @@ func TestDriveOk(t *testing.T) {
 	if resp.Status != "ok" {
 		t.Errorf("status != ok")
 	}
-	expected := []byte{128, 137, 255, 56, 1, 244}
+	expected := []byte{128, 131, 137, 255, 56, 1, 244}
 	roomba.VerifyWritten( //server.Connections[conn_id].Roomba, expected, t)
 		MakeDummyRoomba(), expected, t)
 }
