@@ -14,3 +14,9 @@ func MakeDummyRoomba() *roomba.Roomba {
 	}
 	return DummyRoomba
 }
+
+func ClearDummyRoomba() {
+	if DummyRoomba != nil {
+		DummyRoomba = nil
+	}
+}

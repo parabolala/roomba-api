@@ -4,7 +4,6 @@ import (
 	"github.com/ant0ine/go-json-rest"
 	"log"
 	"net/http"
-	"strconv"
 )
 
 type PortGetResponse struct {
@@ -89,23 +88,12 @@ func (server *RoombaServer) PostPorts(w *rest.ResponseWriter, r *rest.Request) {
 }
 
 func (server *RoombaServer) DeleteConnection(w *rest.ResponseWriter, r *rest.Request) {
-	conn_id_str := r.PathParam("conn_id")
-
-	conn_id, err := strconv.ParseUint(conn_id_str, 10, 32)
-
+	conn, err := server.getConnOrWriteError(w, r)
 	if err != nil {
-		Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	// race condition here
-	_, ok := server.Connections[conn_id]
-	if !ok {
-		Error(w, "connection id %d not found", http.StatusNotFound)
-		return
-	}
-
-	err = server.CloseConnection(conn_id)
+	err = server.CloseConnection(conn.Id)
 
 	if err != nil {
 		Error(w, err.Error(), http.StatusInternalServerError)

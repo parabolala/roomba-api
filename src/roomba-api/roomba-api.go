@@ -4,9 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"github.com/ant0ine/go-json-rest"
-	//    "net/http"
 	"log"
+	"net/http"
 	"roomba"
+	"strconv"
 )
 
 //const (
@@ -182,6 +183,8 @@ func MakeHttpHandlerForServer(server RoombaServer) rest.ResourceHandler {
 		rest.RouteObjectMethod("DELETE", "/connection/:conn_id", &server, "DeleteConnection"),
 		rest.RouteObjectMethod("PUT", "/connection/:conn_id/control/drive",
 			&server, "PutDrive"),
+		rest.RouteObjectMethod("PUT", "/connection/:conn_id/control/direct_drive",
+			&server, "PutDirectDrive"),
 	)
 	return handler
 }
@@ -189,4 +192,25 @@ func MakeHttpHandlerForServer(server RoombaServer) rest.ResourceHandler {
 func MakeHttpHandler() rest.ResourceHandler {
 	server := MakeServer()
 	return MakeHttpHandlerForServer(server)
+}
+
+func (server *RoombaServer) getConnOrWriteError(w *rest.ResponseWriter,
+	req *rest.Request) (
+	conn Connection, err error) {
+	conn_id_str := req.PathParam("conn_id")
+
+	conn_id, err := strconv.ParseUint(conn_id_str, 10, 32)
+
+	if err != nil {
+		Error(w, "malformed connection id: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// race condition here
+	conn, ok := server.Connections[conn_id]
+	if !ok {
+		Error(w, "connection not found", http.StatusNotFound)
+		return
+	}
+	return
 }
