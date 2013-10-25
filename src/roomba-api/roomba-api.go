@@ -185,6 +185,8 @@ func MakeHttpHandlerForServer(server RoombaServer) rest.ResourceHandler {
 			&server, "PutDrive"),
 		rest.RouteObjectMethod("PUT", "/connection/:conn_id/control/direct_drive",
 			&server, "PutDirectDrive"),
+		rest.RouteObjectMethod("GET", "/connection/:conn_id/sensor/:packet_id",
+			&server, "GetSensor"),
 	)
 	return handler
 }
