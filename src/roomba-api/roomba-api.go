@@ -198,9 +198,8 @@ func MakeHttpHandler() rest.ResourceHandler {
 	return MakeHttpHandlerForServer(server)
 }
 
-func (server *RoombaServer) getConnOrWriteError(w *rest.ResponseWriter,
-	req *rest.Request) (
-	conn Connection, err error) {
+func (server *RoombaServer) getConnOrWriteError(
+	w *rest.ResponseWriter, req *rest.Request) (conn Connection, err error) {
 	conn_id_str := req.PathParam("conn_id")
 
 	conn_id, err := strconv.ParseUint(conn_id_str, 10, 32)
@@ -214,6 +213,7 @@ func (server *RoombaServer) getConnOrWriteError(w *rest.ResponseWriter,
 	conn, ok := server.Connections[conn_id]
 	if !ok {
 		Error(w, "connection not found", http.StatusNotFound)
+		err = errors.New("connection not found: " + conn_id_str)
 		return
 	}
 	return

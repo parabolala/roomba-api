@@ -12,6 +12,7 @@ func MakeDummyRoomba() *roomba.Roomba {
 	if DummyRoomba == nil {
 		DummyRoomba = roomba.MakeTestRoomba()
 	}
+	//DummyRoomba.S.(*roomba.CloseableRWBuffer).WriteReadBuffer([]byte{214,11})
 	return DummyRoomba
 }
 

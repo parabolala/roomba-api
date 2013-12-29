@@ -119,7 +119,7 @@ func TestSensorList(t *testing.T) {
 		}
 		for j, packet_byte := range resp.Values[i] {
 			if packet_byte != expected_values[i][j] {
-				t.Errorf("returned datafor packet=%d %v!=expected %v in byte %d", requested_sensors[i], resp.Values[i], expected_values[i], j)
+				t.Errorf("returned data for packet=%d %v!=expected %v in byte %d", requested_sensors[i], resp.Values[i], expected_values[i], j)
 			}
 		}
 	}
