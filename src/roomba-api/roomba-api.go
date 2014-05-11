@@ -3,16 +3,15 @@ package roomba_api
 import (
 	"errors"
 	"fmt"
-	"github.com/ant0ine/go-json-rest"
 	"log"
 	"net/http"
-	"roomba"
 	"strconv"
-)
 
-//const (
-//    IdleTimeoutS uint64 = 10
-//)
+	"github.com/ant0ine/go-json-rest"
+
+	"roomba"
+	rt "roomba/testing"
+)
 
 const PORT_STATE_AVAILABLE string = "available"
 const PORT_STATE_IN_USE string = "in use"
@@ -71,7 +70,7 @@ func (server *RoombaServer) acquireConnection(port_name string) (conn Connection
 	conn.Id = server.nextConnId
 	server.nextConnId++
 	if port_name == DUMMY_PORT_NAME {
-		conn.Roomba = MakeDummyRoomba()
+		conn.Roomba = rt.MakeTestRoomba()
 	} else {
 		conn.Roomba, err = roomba.MakeRoomba(port_name)
 		if err != nil {

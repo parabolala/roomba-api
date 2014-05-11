@@ -5,13 +5,17 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"roomba"
 	"strconv"
 	"testing"
+
+	"roomba/constants"
+	"roomba/sim"
+	rt "roomba/testing"
 )
 
 func TestSensorOk(t *testing.T) {
 	server := MakeServer()
+	defer rt.ClearTestRoomba()
 
 	handler := MakeHttpHandlerForServer(server)
 	code, body := GetResponse(handler, "POST", "/ports/"+DUMMY_PORT_NAME)
@@ -23,14 +27,12 @@ func TestSensorOk(t *testing.T) {
 	port_resp := PortPostResponse{}
 	json.Unmarshal(body, &port_resp)
 	conn_id := port_resp.ConnectionId
-	defer ClearDummyRoomba()
 	url := fmt.Sprintf("/connection/%d/sensor", conn_id)
 
-	output := []byte{42}
-	MakeDummyRoomba().S.(*roomba.CloseableRWBuffer).WriteReadBuffer(output)
+	output := sim.MockSensorValues[constants.SENSOR_CLIFF_RIGHT]
 
 	code, body = GetResponse(handler, "GET",
-		fmt.Sprintf("%s/%d", url, roomba.SENSOR_CLIFF_RIGHT))
+		fmt.Sprintf("%s/%d", url, constants.SENSOR_CLIFF_RIGHT))
 	resp := SensorResponse{}
 	json.Unmarshal(body, &resp)
 
@@ -45,6 +47,7 @@ func TestSensorOk(t *testing.T) {
 
 func TestBadSensorURL(t *testing.T) {
 	server := MakeServer()
+	defer rt.ClearTestRoomba()
 
 	handler := MakeHttpHandlerForServer(server)
 	code, body := GetResponse(handler, "POST", "/ports/"+DUMMY_PORT_NAME)
@@ -56,11 +59,10 @@ func TestBadSensorURL(t *testing.T) {
 	port_resp := PortPostResponse{}
 	json.Unmarshal(body, &port_resp)
 	conn_id := port_resp.ConnectionId
-	defer ClearDummyRoomba()
 	url := fmt.Sprintf("/connection/%d/sensor", conn_id)
 
 	code, body = GetResponse(handler, "GET",
-		fmt.Sprintf("%s/wrong_Sensor_code", url))
+		fmt.Sprintf("%s/wrong_sensor_code", url))
 	resp := SensorResponse{}
 	json.Unmarshal(body, &resp)
 
@@ -75,6 +77,7 @@ func TestBadSensorURL(t *testing.T) {
 
 func TestSensorList(t *testing.T) {
 	server := MakeServer()
+	defer rt.ClearTestRoomba()
 
 	handler := MakeHttpHandlerForServer(server)
 	code, body := GetResponse(handler, "POST", "/ports/"+DUMMY_PORT_NAME)
@@ -86,18 +89,17 @@ func TestSensorList(t *testing.T) {
 	port_resp := PortPostResponse{}
 	json.Unmarshal(body, &port_resp)
 	conn_id := port_resp.ConnectionId
-	defer ClearDummyRoomba()
 	url_ := fmt.Sprintf("/connection/%d/sensor/list?", conn_id)
 
-	requested_sensors := []byte{roomba.SENSOR_DISTANCE,
-		roomba.SENSOR_WALL}
-	expected_values := [][]byte{{10, 20},
-		{35}}
+	requested_sensors := []byte{
+		constants.SENSOR_DISTANCE,
+		constants.SENSOR_WALL}
+	expected_values := [][]byte{sim.MockSensorValues[requested_sensors[0]],
+		sim.MockSensorValues[requested_sensors[1]]}
 
 	qs := url.Values{}
-	for i, packet_data := range expected_values {
+	for i := range expected_values {
 		qs.Add("packet_id", strconv.Itoa(int(requested_sensors[i])))
-		MakeDummyRoomba().S.(*roomba.CloseableRWBuffer).WriteReadBuffer(packet_data)
 	}
 
 	url_ += qs.Encode()
