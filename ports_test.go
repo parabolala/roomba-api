@@ -3,7 +3,7 @@ package roomba_api
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/ant0ine/go-json-rest"
+	"github.com/ant0ine/go-json-rest/rest"
 	"io"
 	"io/ioutil"
 	"log"

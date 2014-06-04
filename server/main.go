@@ -2,12 +2,14 @@ package main
 
 import (
 	"fmt"
-	"github.com/ant0ine/go-json-rest"
 	"net/http"
-	"roomba-api"
+
+	"github.com/ant0ine/go-json-rest/rest"
+
+	"github.com/xa4a/roomba-api"
 )
 
-func hello(w *rest.ResponseWriter, req *rest.Request) {
+func hello(w rest.ResponseWriter, req *rest.Request) {
 	w.WriteJson(&roomba_api.Status{Status: "ok"})
 }
 

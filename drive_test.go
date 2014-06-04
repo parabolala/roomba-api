@@ -4,11 +4,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"testing"
-	//	"github.com/ant0ine/go-json-rest"
 	"net/http"
+	"testing"
 
-	rt "roomba/testing"
+	rt "github.com/xa4a/go-roomba/testing"
 )
 
 func TestDriveOk(t *testing.T) {

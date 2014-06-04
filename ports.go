@@ -1,7 +1,7 @@
 package roomba_api
 
 import (
-	"github.com/ant0ine/go-json-rest"
+	"github.com/ant0ine/go-json-rest/rest"
 	"log"
 	"net/http"
 )
@@ -17,7 +17,7 @@ type PortPostResponse struct {
 	ConnectionId uint64 `json:"connection_id"`
 }
 
-func (server *RoombaServer) GetPorts(w *rest.ResponseWriter, req *rest.Request) {
+func (server *RoombaServer) GetPorts(w rest.ResponseWriter, req *rest.Request) {
 	ports := make([]Port, 0, 3)
 	all_ports, err := listAllPorts()
 	if err != nil {
@@ -43,7 +43,7 @@ func (server *RoombaServer) GetPorts(w *rest.ResponseWriter, req *rest.Request) 
 	w.WriteJson(&status)
 }
 
-func (server *RoombaServer) PostPorts(w *rest.ResponseWriter, r *rest.Request) {
+func (server *RoombaServer) PostPorts(w rest.ResponseWriter, r *rest.Request) {
 	requested_port_name := r.PathParam("name")
 	var found bool
 
@@ -87,7 +87,7 @@ func (server *RoombaServer) PostPorts(w *rest.ResponseWriter, r *rest.Request) {
 	w.WriteJson(resp)
 }
 
-func (server *RoombaServer) DeleteConnection(w *rest.ResponseWriter, r *rest.Request) {
+func (server *RoombaServer) DeleteConnection(w rest.ResponseWriter, r *rest.Request) {
 	conn, err := server.getConnOrWriteError(w, r)
 	if err != nil {
 		return

@@ -1,7 +1,7 @@
 package roomba_api
 
 import (
-	"github.com/ant0ine/go-json-rest"
+	"github.com/ant0ine/go-json-rest/rest"
 	"net/http"
 	"strconv"
 )
@@ -15,7 +15,7 @@ type SensorResponse struct {
 	Value []byte `json:"value"`
 }
 
-func (server *RoombaServer) GetSensor(w *rest.ResponseWriter, req *rest.Request) {
+func (server *RoombaServer) GetSensor(w rest.ResponseWriter, req *rest.Request) {
 	conn, err := server.getConnOrWriteError(w, req)
 	if err != nil {
 		return
@@ -48,7 +48,7 @@ type GetSensorsResponse struct {
 	Values [][]byte `json:"values"`
 }
 
-func (server *RoombaServer) GetSensors(w *rest.ResponseWriter, req *rest.Request) {
+func (server *RoombaServer) GetSensors(w rest.ResponseWriter, req *rest.Request) {
 	conn, err := server.getConnOrWriteError(w, req)
 	if err != nil {
 		return

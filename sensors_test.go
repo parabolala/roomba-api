@@ -8,9 +8,9 @@ import (
 	"strconv"
 	"testing"
 
-	"roomba/constants"
-	"roomba/sim"
-	rt "roomba/testing"
+	"github.com/xa4a/go-roomba/constants"
+	"github.com/xa4a/go-roomba/sim"
+	rt "github.com/xa4a/go-roomba/testing"
 )
 
 func TestSensorOk(t *testing.T) {

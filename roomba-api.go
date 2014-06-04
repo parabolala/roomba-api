@@ -7,10 +7,10 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/ant0ine/go-json-rest"
+	"github.com/ant0ine/go-json-rest/rest"
 
-	"roomba"
-	rt "roomba/testing"
+	"github.com/xa4a/go-roomba"
+	rt "github.com/xa4a/go-roomba/testing"
 )
 
 const PORT_STATE_AVAILABLE string = "available"
@@ -30,7 +30,7 @@ type ErrorStatus struct {
 	Reason string `json:"reason"`
 }
 
-func Error(w *rest.ResponseWriter, error string, code int) {
+func Error(w rest.ResponseWriter, error string, code int) {
 	w.Header().Set("content-type", "application/json")
 	w.WriteHeader(code)
 	resp := ErrorStatus{Status: Status{"error"},
@@ -198,7 +198,7 @@ func MakeHttpHandler() rest.ResourceHandler {
 }
 
 func (server *RoombaServer) getConnOrWriteError(
-	w *rest.ResponseWriter, req *rest.Request) (conn Connection, err error) {
+	w rest.ResponseWriter, req *rest.Request) (conn Connection, err error) {
 	conn_id_str := req.PathParam("conn_id")
 
 	conn_id, err := strconv.ParseUint(conn_id_str, 10, 32)

@@ -2,7 +2,7 @@ package roomba_api
 
 import (
 	"fmt"
-	"github.com/ant0ine/go-json-rest"
+	"github.com/ant0ine/go-json-rest/rest"
 	"net/http"
 )
 
@@ -13,7 +13,7 @@ type DrivePutRequest struct {
 
 type DrivePutResponse Status
 
-func (server *RoombaServer) PutDrive(w *rest.ResponseWriter, req *rest.Request) {
+func (server *RoombaServer) PutDrive(w rest.ResponseWriter, req *rest.Request) {
 	conn, err := server.getConnOrWriteError(w, req)
 	if err != nil {
 		return
@@ -56,7 +56,7 @@ type DirectDrivePutRequest struct {
 }
 type DirectDriveResponse Status
 
-func (server *RoombaServer) PutDirectDrive(w *rest.ResponseWriter, req *rest.Request) {
+func (server *RoombaServer) PutDirectDrive(w rest.ResponseWriter, req *rest.Request) {
 	conn, err := server.getConnOrWriteError(w, req)
 	if err != nil {
 		return
