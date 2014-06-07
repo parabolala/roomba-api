@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 
 	"github.com/ant0ine/go-json-rest/rest"
@@ -16,5 +17,8 @@ func hello(w rest.ResponseWriter, req *rest.Request) {
 func main() {
 	fmt.Println("Serving..")
 	handler := roomba_api.MakeHttpHandler()
-	http.ListenAndServe(":8080", &handler)
+	err := http.ListenAndServe(":8080", &handler)
+	if err != nil {
+		log.Fatalf("failed starting server: %s", err)
+	}
 }
