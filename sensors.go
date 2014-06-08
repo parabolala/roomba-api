@@ -1,82 +1,53 @@
 package roomba_api
 
 import (
-	"github.com/ant0ine/go-json-rest/rest"
-	"net/http"
-	"strconv"
+	"fmt"
 )
 
 type SensorRequest struct {
-	PacketId byte `json:"packet_id"`
+	ConnectionId uint64 `json:"connection_id"`
+	PacketId     byte   `json:"packet_id"`
 }
-
 type SensorResponse struct {
-	Status
 	Value []byte `json:"value"`
 }
 
-func (server *RoombaServer) GetSensor(w rest.ResponseWriter, req *rest.Request) {
-	conn, err := server.getConnOrWriteError(w, req)
-	if err != nil {
-		return
-	}
-
-	packet_id_str := req.PathParam("packet_id")
-
-	packet_id, err := strconv.ParseUint(packet_id_str, 10, 8)
-	if err != nil {
-		Error(w, "bad packet id requested: "+packet_id_str,
-			http.StatusNotFound)
-		return
-	}
-
-	sensor_data, err := conn.Roomba.Sensors(byte(packet_id))
-
-	if err != nil {
-		Error(w, "error reading sensor packet: "+err.Error(),
-			http.StatusInternalServerError)
-		return
-	}
-
-	response := SensorResponse{Status: Status{"ok"},
-		Value: sensor_data}
-	w.WriteJson(&response)
+type SensorListRequest struct {
+	ConnectionId uint64 `json:"connection_id"`
+	PacketIds    []byte `json:"packet_ids"`
 }
-
-type GetSensorsResponse struct {
-	Status
+type SensorListResponse struct {
 	Values [][]byte `json:"values"`
 }
 
-func (server *RoombaServer) GetSensors(w rest.ResponseWriter, req *rest.Request) {
-	conn, err := server.getConnOrWriteError(w, req)
-	if err != nil {
-		return
+func (server RoombaServer) Sensor(req SensorRequest, resp *SensorResponse) error {
+	conn, ok := server.Connections[req.ConnectionId]
+	if !ok {
+		return fmt.Errorf("connection not found: %d", req.ConnectionId)
 	}
 
-	req.ParseForm()
-	packet_id_strs := req.Form["packet_id"]
-
-	packet_ids := make([]byte, 0, len(packet_id_strs))
-	for _, packet_id_str := range packet_id_strs {
-		packet_id, err := strconv.ParseUint(packet_id_str, 10, 8)
-		if err != nil {
-			Error(w, "bad packet id requested: "+packet_id_str,
-				http.StatusNotFound)
-			return
-		}
-		packet_ids = append(packet_ids, byte(packet_id))
-	}
-
-	sensor_data, err := conn.Roomba.QueryList(packet_ids)
+	sensor_data, err := conn.Roomba.Sensors(req.PacketId)
 
 	if err != nil {
-		Error(w, "error reading sensors data: "+err.Error(),
-			http.StatusInternalServerError)
-		return
+		return fmt.Errorf("error reading sensor packet: " + err.Error())
 	}
 
-	response := GetSensorsResponse{Status: Status{"ok"},
-		Values: sensor_data}
-	w.WriteJson(&response)
+	resp.Value = sensor_data
+	return nil
+}
+
+func (server RoombaServer) SensorList(req *SensorListRequest, resp *SensorListResponse) error {
+	conn, ok := server.Connections[req.ConnectionId]
+	if !ok {
+		return fmt.Errorf("connection not found: %d", req.ConnectionId)
+	}
+
+	sensor_data, err := conn.Roomba.QueryList(req.PacketIds)
+
+	if err != nil {
+		return fmt.Errorf("error reading sensors data: " + err.Error())
+	}
+
+	resp.Values = sensor_data
+	return nil
 }

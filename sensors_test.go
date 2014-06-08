@@ -1,11 +1,6 @@
 package roomba_api
 
 import (
-	"encoding/json"
-	"fmt"
-	"net/http"
-	"net/url"
-	"strconv"
 	"testing"
 
 	"github.com/xa4a/go-roomba/constants"
@@ -14,30 +9,35 @@ import (
 )
 
 func TestSensorOk(t *testing.T) {
-	server := MakeServer()
+	StartTestServer()
+	defer StopTestServer()
 	defer rt.ClearTestRoomba()
 
-	handler := MakeHttpHandlerForServer(server)
-	code, body := GetResponse(handler, "POST", "/ports/"+DUMMY_PORT_NAME)
+	client := NewTestClient(t)
+	defer client.Close()
 
-	if code != 200 {
-		t.Errorf("failed acquiring dummy connection")
+	conn_req := AcquireConnectionRequest{Name: DUMMY_PORT_NAME}
+	conn_resp := AcquireConnectionResponse{}
+
+	err := client.Call("RoombaServer.AcquireConnection", conn_req, &conn_resp)
+
+	if err != nil {
+		t.Fatalf("failed acquiring dummy connection: %s", err)
 	}
 
-	port_resp := PortPostResponse{}
-	json.Unmarshal(body, &port_resp)
-	conn_id := port_resp.ConnectionId
-	url := fmt.Sprintf("/connection/%d/sensor", conn_id)
+	conn_id := conn_resp.ConnectionId
 
 	output := sim.MockSensorValues[constants.SENSOR_CLIFF_RIGHT]
 
-	code, body = GetResponse(handler, "GET",
-		fmt.Sprintf("%s/%d", url, constants.SENSOR_CLIFF_RIGHT))
-	resp := SensorResponse{}
-	json.Unmarshal(body, &resp)
+	s_req := SensorRequest{
+		ConnectionId: conn_id,
+		PacketId:     constants.SENSOR_CLIFF_RIGHT,
+	}
+	resp := &SensorResponse{}
+	err = client.Call("RoombaServer.Sensor", s_req, resp)
 
-	if resp.Status.Status != "ok" {
-		t.Errorf("status != ok")
+	if err != nil {
+		t.Fatalf("rpc call failed: %s", err)
 	}
 
 	if len(resp.Value) != len(output) || (resp.Value[0] != output[0]) {
@@ -45,71 +45,88 @@ func TestSensorOk(t *testing.T) {
 	}
 }
 
-func TestBadSensorURL(t *testing.T) {
-	server := MakeServer()
+func TestBadSensorPacketId(t *testing.T) {
+	StartTestServer()
+	defer StopTestServer()
 	defer rt.ClearTestRoomba()
 
-	handler := MakeHttpHandlerForServer(server)
-	code, body := GetResponse(handler, "POST", "/ports/"+DUMMY_PORT_NAME)
+	client := NewTestClient(t)
+	defer client.Close()
 
-	if code != 200 {
-		t.Errorf("failed acquiring dummy connection")
+	conn_req := AcquireConnectionRequest{Name: DUMMY_PORT_NAME}
+	conn_resp := AcquireConnectionResponse{}
+
+	err := client.Call("RoombaServer.AcquireConnection", conn_req, &conn_resp)
+
+	if err != nil {
+		t.Fatalf("failed acquiring dummy connection: %s", err)
 	}
 
-	port_resp := PortPostResponse{}
-	json.Unmarshal(body, &port_resp)
-	conn_id := port_resp.ConnectionId
-	url := fmt.Sprintf("/connection/%d/sensor", conn_id)
+	conn_id := conn_resp.ConnectionId
 
-	code, body = GetResponse(handler, "GET",
-		fmt.Sprintf("%s/wrong_sensor_code", url))
-	resp := SensorResponse{}
-	json.Unmarshal(body, &resp)
+	s_req := SensorRequest{ConnectionId: conn_id, PacketId: 250}
+	s_resp := &SensorResponse{}
+	err = client.Call("RoombaServer.Sensor", s_req, s_resp)
 
-	if resp.Status.Status == "ok" {
-		t.Errorf("status == ok")
+	if err == nil {
+		t.Errorf("rpc call unexpectedly succeeded")
 	}
+}
 
-	if code != http.StatusNotFound {
-		t.Errorf("code != 404")
+func TestBadSensorConnId(t *testing.T) {
+	StartTestServer()
+	defer StopTestServer()
+
+	client := NewTestClient(t)
+	defer client.Close()
+
+	s_req := SensorRequest{ConnectionId: 42, PacketId: 250}
+	s_resp := &SensorResponse{}
+	err := client.Call("RoombaServer.Sensor", s_req, s_resp)
+
+	if err == nil {
+		t.Errorf("rpc call unexpectedly succeeded")
 	}
 }
 
 func TestSensorList(t *testing.T) {
-	server := MakeServer()
+	StartTestServer()
+	defer StopTestServer()
 	defer rt.ClearTestRoomba()
 
-	handler := MakeHttpHandlerForServer(server)
-	code, body := GetResponse(handler, "POST", "/ports/"+DUMMY_PORT_NAME)
+	client := NewTestClient(t)
+	defer client.Close()
 
-	if code != 200 {
-		t.Errorf("failed acquiring dummy connection")
+	conn_req := AcquireConnectionRequest{Name: DUMMY_PORT_NAME}
+	conn_resp := AcquireConnectionResponse{}
+
+	err := client.Call("RoombaServer.AcquireConnection", conn_req, &conn_resp)
+
+	if err != nil {
+		t.Fatalf("failed acquiring dummy connection: %s", err)
 	}
 
-	port_resp := PortPostResponse{}
-	json.Unmarshal(body, &port_resp)
-	conn_id := port_resp.ConnectionId
-	url_ := fmt.Sprintf("/connection/%d/sensor/list?", conn_id)
+	conn_id := conn_resp.ConnectionId
 
 	requested_sensors := []byte{
 		constants.SENSOR_DISTANCE,
-		constants.SENSOR_WALL}
-	expected_values := [][]byte{sim.MockSensorValues[requested_sensors[0]],
-		sim.MockSensorValues[requested_sensors[1]]}
-
-	qs := url.Values{}
-	for i := range expected_values {
-		qs.Add("packet_id", strconv.Itoa(int(requested_sensors[i])))
+		constants.SENSOR_WALL,
+	}
+	expected_values := [][]byte{
+		sim.MockSensorValues[requested_sensors[0]],
+		sim.MockSensorValues[requested_sensors[1]],
 	}
 
-	url_ += qs.Encode()
+	s_req := SensorListRequest{
+		ConnectionId: conn_id,
+		PacketIds:    requested_sensors,
+	}
+	resp := &SensorListResponse{}
 
-	code, body = GetResponse(handler, "GET", url_)
-	resp := GetSensorsResponse{}
-	json.Unmarshal(body, &resp)
+	err = client.Call("RoombaServer.SensorList", s_req, resp)
 
-	if resp.Status.Status != "ok" {
-		t.Errorf("status != ok")
+	if err != nil {
+		t.Fatalf("rpc call failed: %s", err)
 	}
 
 	if len(resp.Values) != len(expected_values) {
@@ -124,5 +141,29 @@ func TestSensorList(t *testing.T) {
 				t.Errorf("returned data for packet=%d %v!=expected %v in byte %d", requested_sensors[i], resp.Values[i], expected_values[i], j)
 			}
 		}
+	}
+}
+
+func TestSensorListBadConnId(t *testing.T) {
+	StartTestServer()
+	defer StopTestServer()
+
+	client := NewTestClient(t)
+	defer client.Close()
+
+	requested_sensors := []byte{
+		constants.SENSOR_DISTANCE,
+	}
+
+	s_req := SensorListRequest{
+		ConnectionId: 42,
+		PacketIds:    requested_sensors,
+	}
+	resp := &SensorListResponse{}
+
+	err := client.Call("RoombaServer.SensorList", s_req, resp)
+
+	if err == nil {
+		t.Fatalf("rpc call succeeded unexpectedly")
 	}
 }

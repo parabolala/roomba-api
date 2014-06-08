@@ -4,10 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"net/http"
-	"strconv"
-
-	"github.com/ant0ine/go-json-rest/rest"
 
 	"github.com/xa4a/go-roomba"
 	rt "github.com/xa4a/go-roomba/testing"
@@ -28,17 +24,6 @@ type Status struct {
 type ErrorStatus struct {
 	Status
 	Reason string `json:"reason"`
-}
-
-func Error(w rest.ResponseWriter, error string, code int) {
-	w.Header().Set("content-type", "application/json")
-	w.WriteHeader(code)
-	resp := ErrorStatus{Status: Status{"error"},
-		Reason: error}
-	err := w.WriteJson(resp)
-	if err != nil {
-		panic(err)
-	}
 }
 
 type Connection struct {
@@ -169,51 +154,5 @@ func MakeServer() (s RoombaServer) {
 	s.PortsInUse = make(map[string]bool)
 	s.nextConnId = 1
 	go s.manageConnections()
-	return
-}
-
-func MakeHttpHandlerForServer(server RoombaServer) rest.ResourceHandler {
-	handler := rest.ResourceHandler{
-		EnableRelaxedContentType: true,
-	}
-	handler.SetRoutes(
-		rest.RouteObjectMethod("GET", "/ports", &server, "GetPorts"),
-		rest.RouteObjectMethod("POST", "/ports/*name", &server, "PostPorts"),
-		rest.RouteObjectMethod("DELETE", "/connection/:conn_id", &server, "DeleteConnection"),
-		rest.RouteObjectMethod("PUT", "/connection/:conn_id/control/drive",
-			&server, "PutDrive"),
-		rest.RouteObjectMethod("PUT", "/connection/:conn_id/control/direct_drive",
-			&server, "PutDirectDrive"),
-		rest.RouteObjectMethod("GET", "/connection/:conn_id/sensor/list",
-			&server, "GetSensors"),
-		rest.RouteObjectMethod("GET", "/connection/:conn_id/sensor/:packet_id",
-			&server, "GetSensor"),
-	)
-	return handler
-}
-
-func MakeHttpHandler() rest.ResourceHandler {
-	server := MakeServer()
-	return MakeHttpHandlerForServer(server)
-}
-
-func (server *RoombaServer) getConnOrWriteError(
-	w rest.ResponseWriter, req *rest.Request) (conn Connection, err error) {
-	conn_id_str := req.PathParam("conn_id")
-
-	conn_id, err := strconv.ParseUint(conn_id_str, 10, 32)
-
-	if err != nil {
-		Error(w, "malformed connection id: "+err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	// race condition here
-	conn, ok := server.Connections[conn_id]
-	if !ok {
-		Error(w, "connection not found", http.StatusNotFound)
-		err = errors.New("connection not found: " + conn_id_str)
-		return
-	}
 	return
 }

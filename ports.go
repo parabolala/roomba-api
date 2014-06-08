@@ -1,30 +1,34 @@
 package roomba_api
 
 import (
-	"github.com/ant0ine/go-json-rest/rest"
+	"fmt"
 	"log"
-	"net/http"
 )
 
-type PortGetResponse struct {
-	Status
+type GetPortsRequest struct{}
+type GetPortsResponse struct {
 	Ports []Port `json:"ports"`
 }
 
-type PortPostResponse struct {
-	Status
+type AcquireConnectionRequest struct {
+	Name string `json:"name"`
+}
+type AcquireConnectionResponse struct {
 	Name         string `json:"name"`
 	ConnectionId uint64 `json:"connection_id"`
 }
 
-func (server *RoombaServer) GetPorts(w rest.ResponseWriter, req *rest.Request) {
-	ports := make([]Port, 0, 3)
+type ReleaseConnectionRequest struct {
+	ConnectionId uint64 `json:"connection_id"`
+}
+type ReleaseConnectionResponse struct{}
+
+func (server RoombaServer) GetPorts(req *GetPortsRequest, resp *GetPortsResponse) error {
 	all_ports, err := listAllPorts()
 	if err != nil {
-		Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return err
 	}
-	ports = append(ports, Port{DUMMY_PORT_NAME, PORT_STATE_AVAILABLE})
+	resp.Ports = append(resp.Ports, Port{DUMMY_PORT_NAME, PORT_STATE_AVAILABLE})
 	for _, port_filename := range all_ports {
 		log.Println("Found port " + port_filename)
 
@@ -36,24 +40,21 @@ func (server *RoombaServer) GetPorts(w rest.ResponseWriter, req *rest.Request) {
 			state = PORT_STATE_AVAILABLE
 		}
 
-		ports = append(ports, Port{port_filename, state})
+		resp.Ports = append(resp.Ports, Port{port_filename, state})
 	}
-	status := PortGetResponse{Status: Status{"ok"},
-		Ports: ports}
-	w.WriteJson(&status)
+	return nil
 }
 
-func (server *RoombaServer) PostPorts(w rest.ResponseWriter, r *rest.Request) {
-	requested_port_name := r.PathParam("name")
+func (server RoombaServer) AcquireConnection(req *AcquireConnectionRequest, resp *AcquireConnectionResponse) error {
+	requested_port_name := req.Name
 	var found bool
 
-	all_ports, err := listAllPorts()
-	if err != nil {
-		Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
 	if requested_port_name != DUMMY_PORT_NAME {
+		all_ports, err := listAllPorts()
+		if err != nil {
+			return err
+		}
+
 		for _, port_filename := range all_ports {
 			if port_filename == requested_port_name {
 				found = true
@@ -62,42 +63,38 @@ func (server *RoombaServer) PostPorts(w rest.ResponseWriter, r *rest.Request) {
 		}
 
 		if !found {
-			Error(w, "Not found", http.StatusNotFound)
-			return
+			return fmt.Errorf("port %s not found", requested_port_name)
 		}
 	}
 
-	// race condition here
+	// TODO: race condition here
 	_, ok := server.PortsInUse[requested_port_name]
 
 	if ok {
-		Error(w, "port is already in use", http.StatusGone)
-		return
+		return fmt.Errorf("port is already in use: %s", requested_port_name)
 	}
 
 	conn_id, err := server.GetConnection(requested_port_name)
 
 	if err != nil {
-		Error(w, "failed getting a connection: "+err.Error(),
-			http.StatusInternalServerError)
-		return
+		return fmt.Errorf("failed getting a connection: %s", err.Error())
 	}
 
-	resp := PortPostResponse{Status{"ok"}, requested_port_name, conn_id}
-	w.WriteJson(resp)
+	resp.Name = requested_port_name
+	resp.ConnectionId = conn_id
+	return nil
 }
 
-func (server *RoombaServer) DeleteConnection(w rest.ResponseWriter, r *rest.Request) {
-	conn, err := server.getConnOrWriteError(w, r)
-	if err != nil {
-		return
+func (server RoombaServer) ReleaseConnection(req *ReleaseConnectionRequest, resp *ReleaseConnectionResponse) error {
+	conn, ok := server.Connections[req.ConnectionId]
+	if !ok {
+		return fmt.Errorf("connection not found: %d", conn)
 	}
 
-	err = server.CloseConnection(conn.Id)
+	err := server.CloseConnection(conn.Id)
 
 	if err != nil {
-		Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return err
 	}
-	w.WriteJson(Status{"ok"})
+	return nil
 }

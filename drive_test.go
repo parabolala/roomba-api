@@ -1,172 +1,178 @@
 package roomba_api
 
 import (
-	"bytes"
-	"encoding/json"
-	"fmt"
-	"net/http"
 	"testing"
 
 	rt "github.com/xa4a/go-roomba/testing"
 )
 
 func TestDriveOk(t *testing.T) {
-	server := MakeServer()
+	StartTestServer()
+	defer StopTestServer()
 	defer rt.ClearTestRoomba()
 
-	handler := MakeHttpHandlerForServer(server)
-	code, body := GetResponse(handler, "POST", "/ports/"+DUMMY_PORT_NAME)
+	client := NewTestClient(t)
+	defer client.Close()
 
-	if code != 200 {
-		t.Errorf("failed acquiring dummy connection")
+	conn_req := AcquireConnectionRequest{Name: DUMMY_PORT_NAME}
+	conn_resp := AcquireConnectionResponse{}
+
+	err := client.Call("RoombaServer.AcquireConnection", conn_req, &conn_resp)
+
+	if err != nil {
+		t.Fatalf("failed acquiring dummy connection: %s", err)
 	}
 
-	port_resp := PortPostResponse{}
-	json.Unmarshal(body, &port_resp)
-	conn_id := port_resp.ConnectionId
-	url := fmt.Sprintf("/connection/%d/control/drive", conn_id)
+	conn_id := conn_resp.ConnectionId
 
-	data, _ := json.Marshal(DrivePutRequest{-200, 500})
-	b := bytes.NewBuffer(data)
-	code, body = GetResponseData(handler, "PUT", url, b)
+	drive_req := DriveRequest{conn_id, -200, 500}
+	err = client.Call("RoombaServer.Drive", drive_req, &DriveResponse{})
 
-	if code != 200 {
-		t.Errorf("response code is not 200")
+	if err != nil {
+		t.Fatalf("rpc call failed unexpectedly: %s", err)
 	}
 
-	resp := DrivePutResponse{}
-	json.Unmarshal(body, &resp)
-
-	if resp.Status != "ok" {
-		t.Errorf("status != ok")
-	}
 	expected := []byte{128, 131, 137, 255, 56, 1, 244}
-	rt.VerifyWritten(server.Connections[conn_id].Roomba, expected, t)
+	rt.VerifyWritten(testRoombaServer.Connections[conn_id].Roomba, expected, t)
 
 	// Special cases radius.
 	for _, radius := range []int16{-2000, 2000, 0, 10, -10, 32767, -32768} {
-		data, _ = json.Marshal(DrivePutRequest{-200, radius})
-		b = bytes.NewBuffer(data)
-		code, body = GetResponseData(handler, "PUT", url, b)
+		drive_req = DriveRequest{conn_id, -200, radius}
+		err = client.Call("RoombaServer.Drive", drive_req, &DriveResponse{})
 
-		if code != 200 {
-			t.Errorf("response code is not 200 for radius %d", radius)
+		if err != nil {
+			t.Fatalf("rpc call failed unexpectedly for radius %d: %s", radius, err)
 		}
 	}
 }
 
 func TestDriveWrongConnId(t *testing.T) {
-	server := MakeServer()
+	StartTestServer()
+	defer StopTestServer()
 
-	handler := MakeHttpHandlerForServer(server)
+	client := NewTestClient(t)
+	defer client.Close()
 
-	data, _ := json.Marshal(DrivePutRequest{-200, 500})
-	b := bytes.NewBuffer(data)
-	code, _ := GetResponseData(handler, "PUT", "/connection/42/control/drive", b)
+	drive_req := DriveRequest{42, -200, 500}
+	err := client.Call("RoombaServer.Drive", drive_req, &DriveResponse{})
 
-	if code != http.StatusNotFound {
-		t.Errorf("response code is not 404")
+	if err == nil {
+		t.Fatalf("rpc call succeeded unexpectedly")
 	}
 }
 
 func TestDriveWrongVelocityRadius(t *testing.T) {
-	server := MakeServer()
+	StartTestServer()
+	defer StopTestServer()
 	defer rt.ClearTestRoomba()
 
-	handler := MakeHttpHandlerForServer(server)
-	code, body := GetResponse(handler, "POST", "/ports/"+DUMMY_PORT_NAME)
+	client := NewTestClient(t)
+	defer client.Close()
 
-	if code != 200 {
-		t.Errorf("failed acquiring dummy connection")
+	conn_req := AcquireConnectionRequest{Name: DUMMY_PORT_NAME}
+	conn_resp := AcquireConnectionResponse{}
+
+	err := client.Call("RoombaServer.AcquireConnection", conn_req, &conn_resp)
+
+	if err != nil {
+		t.Fatalf("failed acquiring dummy connection: %s", err)
 	}
 
-	port_resp := PortPostResponse{}
-	json.Unmarshal(body, &port_resp)
-	conn_id := port_resp.ConnectionId
-	url := fmt.Sprintf("/connection/%d/control/drive", conn_id)
+	conn_id := conn_resp.ConnectionId
 
 	for _, velocity := range []int16{-501, -1000, 501, 1001} {
-		data, _ := json.Marshal(DrivePutRequest{velocity, 500})
-		b := bytes.NewBuffer(data)
-		code, _ = GetResponseData(handler, "PUT", url, b)
+		drive_req := DriveRequest{conn_id, velocity, 500}
+		err = client.Call("RoombaServer.Drive", drive_req, &DriveResponse{})
 
-		if code != http.StatusBadRequest {
-			t.Errorf("response code is not 400 for velocity %d", velocity)
+		if err == nil {
+			t.Errorf("rpc call succeeded unexpectedly")
 		}
 	}
 
 	for _, radius := range []int16{-2001, -10000, 2001, 10000} {
-		data, _ := json.Marshal(DrivePutRequest{315, radius})
-		b := bytes.NewBuffer(data)
-		code, _ = GetResponseData(handler, "PUT", url, b)
+		drive_req := DriveRequest{conn_id, 315, radius}
+		err = client.Call("RoombaServer.Drive", drive_req, &DriveResponse{})
 
-		if code != http.StatusBadRequest {
-			t.Errorf("response code is not 400 for radius %d", radius)
+		if err == nil {
+			t.Errorf("rpc call succeeded unexpectedly")
 		}
 	}
 }
 
 func TestDirectDriveOk(t *testing.T) {
-	server := MakeServer()
+	StartTestServer()
+	defer StopTestServer()
 	defer rt.ClearTestRoomba()
 
-	handler := MakeHttpHandlerForServer(server)
-	code, body := GetResponse(handler, "POST", "/ports/"+DUMMY_PORT_NAME)
+	client := NewTestClient(t)
+	defer client.Close()
 
-	if code != 200 {
-		t.Errorf("failed acquiring dummy connection")
+	conn_req := AcquireConnectionRequest{Name: DUMMY_PORT_NAME}
+	conn_resp := AcquireConnectionResponse{}
+
+	err := client.Call("RoombaServer.AcquireConnection", conn_req, &conn_resp)
+
+	if err != nil {
+		t.Errorf("failed acquiring dummy connection: %s", err)
 	}
 
-	port_resp := PortPostResponse{}
-	json.Unmarshal(body, &port_resp)
-	conn_id := port_resp.ConnectionId
-	url := fmt.Sprintf("/connection/%d/control/direct_drive", conn_id)
+	conn_id := conn_resp.ConnectionId
 
-	data, _ := json.Marshal(DirectDrivePutRequest{127, 256})
-	b := bytes.NewBuffer(data)
-	code, body = GetResponseData(handler, "PUT", url, b)
+	drive_req := DirectDriveRequest{conn_id, 127, 256}
+	err = client.Call("RoombaServer.DirectDrive", drive_req, &DirectDriveResponse{})
 
-	if code != 200 {
-		t.Errorf("response code is not 200")
+	if err != nil {
+		t.Fatalf("rpc call failed unexpectedly: %s", err)
 	}
 
-	resp := DrivePutResponse{}
-	json.Unmarshal(body, &resp)
-
-	if resp.Status != "ok" {
-		t.Errorf("status != ok")
-	}
 	expected := []byte{128, 131, 145, 0, 127, 1, 0}
-	rt.VerifyWritten(server.Connections[conn_id].Roomba, expected, t)
+	rt.VerifyWritten(testRoombaServer.Connections[conn_id].Roomba, expected, t)
+}
+
+func TestDirectDriveWrongConnId(t *testing.T) {
+	StartTestServer()
+	defer StopTestServer()
+
+	client := NewTestClient(t)
+	defer client.Close()
+
+	drive_req := DirectDriveRequest{42, 127, 256}
+	err := client.Call("RoombaServer.DirectDrive", drive_req, &DirectDriveResponse{})
+
+	if err == nil {
+		t.Fatalf("rpc call succeeded unexpectedly")
+	}
 }
 
 func TestDirectDriveWrongVelocity(t *testing.T) {
-	server := MakeServer()
+	StartTestServer()
+	defer StopTestServer()
 	defer rt.ClearTestRoomba()
 
-	handler := MakeHttpHandlerForServer(server)
-	code, body := GetResponse(handler, "POST", "/ports/"+DUMMY_PORT_NAME)
+	client := NewTestClient(t)
+	defer client.Close()
 
-	if code != 200 {
-		t.Errorf("failed acquiring dummy connection")
+	conn_req := AcquireConnectionRequest{Name: DUMMY_PORT_NAME}
+	conn_resp := AcquireConnectionResponse{}
+
+	err := client.Call("RoombaServer.AcquireConnection", conn_req, &conn_resp)
+
+	if err != nil {
+		t.Fatalf("failed acquiring dummy connection: %s", err)
 	}
 
-	port_resp := PortPostResponse{}
-	json.Unmarshal(body, &port_resp)
-	conn_id := port_resp.ConnectionId
-	url := fmt.Sprintf("/connection/%d/control/direct_drive", conn_id)
-
+	conn_id := conn_resp.ConnectionId
 	for _, velocities := range [][2]int16{{-501, 500},
 		{-1000, 501},
 		{35, 1002}} {
 		left := velocities[0]
 		right := velocities[1]
-		data, _ := json.Marshal(DirectDrivePutRequest{left, right})
-		b := bytes.NewBuffer(data)
-		code, _ = GetResponseData(handler, "PUT", url, b)
 
-		if code != http.StatusBadRequest {
-			t.Errorf("response code is not 400 for velocities %v", velocities)
+		drive_req := DirectDriveRequest{conn_id, left, right}
+		err = client.Call("RoombaServer.DirectDrive", drive_req, &DirectDriveResponse{})
+
+		if err == nil {
+			t.Errorf("rpc call succeeded unexpectedly")
 		}
 	}
 }

@@ -2,90 +2,63 @@ package roomba_api
 
 import (
 	"fmt"
-	"github.com/ant0ine/go-json-rest/rest"
-	"net/http"
 )
 
-type DrivePutRequest struct {
-	Velocity int16 `json:"velocity"`
-	Radius   int16 `json:"radius"`
+type DriveRequest struct {
+	ConnectionId uint64 `json:"connection_id"`
+	Velocity     int16  `json:"velocity"`
+	Radius       int16  `json:"radius"`
+}
+type DriveResponse struct{}
+
+type DirectDriveRequest struct {
+	ConnectionId uint64 `json:"connection_id"`
+	Left         int16  `json:"left"`
+	Right        int16  `json:"right"`
+}
+type DirectDriveResponse struct{}
+
+func (server RoombaServer) Drive(req DriveRequest, resp *DriveResponse) error {
+	conn, ok := server.Connections[req.ConnectionId]
+	if !ok {
+		return fmt.Errorf("connection not found: %d", req.ConnectionId)
+	}
+
+	if !(-500 <= req.Velocity && req.Velocity <= 500) {
+		return fmt.Errorf("velocity should be in range [-500; 500], not %d", req.Velocity)
+	}
+
+	if !(-2000 <= req.Radius &&
+		req.Radius <= 2000 ||
+		req.Radius == ^0x7fff ||
+		req.Radius == 0x7fff) {
+		return fmt.Errorf(
+			"radius should either be in range [-2000; 2000] or one of 32767, 32768, not %d",
+			req.Radius,
+		)
+	}
+
+	return conn.Roomba.Drive(req.Velocity, req.Radius)
 }
 
-type DrivePutResponse Status
-
-func (server *RoombaServer) PutDrive(w rest.ResponseWriter, req *rest.Request) {
-	conn, err := server.getConnOrWriteError(w, req)
-	if err != nil {
-		return
+func (server RoombaServer) DirectDrive(req DirectDriveRequest, resp *DirectDriveResponse) error {
+	conn, ok := server.Connections[req.ConnectionId]
+	if !ok {
+		return fmt.Errorf("connection not found: %d", req.ConnectionId)
 	}
 
-	drive_req := DrivePutRequest{}
-	err = req.DecodeJsonPayload(&drive_req)
-	if err != nil {
-		Error(w, "can't decode json request", http.StatusBadRequest)
-		return
+	if !(-500 <= req.Left && req.Left <= 500) {
+		return fmt.Errorf(
+			"left velocity should be in range [-500; 500], not %d",
+			req.Left,
+		)
+	}
+	if !(-500 <= req.Right && req.Right <= 500) {
+		return fmt.Errorf(
+			"left velocity should be in range [-500; 500], not %d",
+			req.Right,
+		)
 	}
 
-	if !(-500 <= drive_req.Velocity &&
-		drive_req.Velocity <= 500) {
-		Error(w, fmt.Sprintf("velocity should be in range [-500; 500], not %d",
-			drive_req.Velocity),
-			http.StatusBadRequest)
-		return
-	}
-
-	if !(-2000 <= drive_req.Radius &&
-		drive_req.Radius <= 2000 ||
-		drive_req.Radius == ^0x7fff ||
-		drive_req.Radius == 0x7fff) {
-		Error(w, fmt.Sprintf("radius should either be in range [-2000; 2000] or "+
-			"be one of 32767, 32768, not %d", drive_req.Radius),
-			http.StatusBadRequest)
-		return
-	}
-
-	conn.Roomba.Drive(drive_req.Velocity, drive_req.Radius)
-
-	w.WriteJson(&Status{"ok"})
-	return
-}
-
-type DirectDrivePutRequest struct {
-	Left  int16 `json:"left"`
-	Right int16 `json:"right"`
-}
-type DirectDriveResponse Status
-
-func (server *RoombaServer) PutDirectDrive(w rest.ResponseWriter, req *rest.Request) {
-	conn, err := server.getConnOrWriteError(w, req)
-	if err != nil {
-		return
-	}
-
-	drive_req := DirectDrivePutRequest{}
-	err = req.DecodeJsonPayload(&drive_req)
-	if err != nil {
-		Error(w, "can't decode json request", http.StatusBadRequest)
-		return
-	}
-
-	if !(-500 <= drive_req.Left &&
-		drive_req.Left <= 500) {
-		Error(w, fmt.Sprintf("left velocity should be in range [-500; 500], not %d",
-			drive_req.Left),
-			http.StatusBadRequest)
-		return
-	}
-	if !(-500 <= drive_req.Right &&
-		drive_req.Right <= 500) {
-		Error(w, fmt.Sprintf("left velocity should be in range [-500; 500], not %d",
-			drive_req.Right),
-			http.StatusBadRequest)
-		return
-	}
-
-	conn.Roomba.DirectDrive(drive_req.Left, drive_req.Right)
-
-	w.WriteJson(&Status{"ok"})
-	return
+	return conn.Roomba.DirectDrive(req.Left, req.Right)
 }

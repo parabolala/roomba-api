@@ -1,53 +1,21 @@
 package roomba_api
 
 import (
-	"encoding/json"
-	"fmt"
-	"github.com/ant0ine/go-json-rest/rest"
-	"io"
-	"io/ioutil"
-	"log"
-	"net/http"
-	"net/http/httptest"
 	"testing"
 )
 
-func GetResponseData(h rest.ResourceHandler, method, path string, body io.Reader) (int, []byte) {
-	req, err := http.NewRequest(method, path, body)
+func TestPortsGet(t *testing.T) {
+	StartTestServer()
+	defer StopTestServer()
+
+	client := NewTestClient(t)
+	defer client.Close()
+
+	resp := GetPortsResponse{}
+	err := client.Call("RoombaServer.GetPorts", GetPortsRequest{}, &resp)
+
 	if err != nil {
-		log.Fatal(err)
-	}
-
-	w := httptest.NewRecorder()
-	h.ServeHTTP(w, req)
-
-	bytes, err := ioutil.ReadAll(w.Body)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	return w.Code, bytes
-}
-
-func GetResponse(h rest.ResourceHandler, method, path string) (int, []byte) {
-	return GetResponseData(h, method, path, nil)
-}
-
-func TestGetPorts(t *testing.T) {
-	server := MakeServer()
-
-	handler := MakeHttpHandlerForServer(server)
-	code, body := GetResponse(handler, "GET", "/ports")
-
-	if code != 200 {
-		t.Errorf("response code is not 200")
-	}
-
-	resp := PortGetResponse{}
-	json.Unmarshal(body, &resp)
-
-	if resp.Status.Status != "ok" {
-		t.Errorf("status != ok")
+		t.Fatalf("rpc call failed: %s", err)
 	}
 
 	if len(resp.Ports) < 1 {
@@ -63,25 +31,25 @@ func TestGetPorts(t *testing.T) {
 	}
 
 	if !dummyPresent {
-		t.Fatalf("DummyPort is not present in ports")
+		t.Errorf("DummyPort is not present in ports")
 	}
 }
 
 func TestAcquireReleaseDummy(t *testing.T) {
-	server := MakeServer()
+	StartTestServer()
+	defer StopTestServer()
 
-	handler := MakeHttpHandlerForServer(server)
-	code, body := GetResponse(handler, "POST", "/ports/"+DUMMY_PORT_NAME)
+	client := NewTestClient(t)
+	defer client.Close()
 
-	if code != 200 {
-		t.Errorf("response code is not 200")
+	req := &AcquireConnectionRequest{
+		Name: DUMMY_PORT_NAME,
 	}
+	resp := &AcquireConnectionResponse{}
+	err := client.Call("RoombaServer.AcquireConnection", req, &resp)
 
-	resp := PortPostResponse{}
-	json.Unmarshal(body, &resp)
-
-	if resp.Status.Status != "ok" {
-		t.Errorf("status != ok")
+	if err != nil {
+		t.Fatalf("rpc call failed: %s", err)
 	}
 
 	if resp.Name != DUMMY_PORT_NAME {
@@ -89,53 +57,47 @@ func TestAcquireReleaseDummy(t *testing.T) {
 			resp.Name, DUMMY_PORT_NAME)
 	}
 
-	code, body = GetResponse(handler, "DELETE",
-		fmt.Sprintf("/connection/%d", resp.ConnectionId))
+	err = client.Call(
+		"RoombaServer.ReleaseConnection",
+		&ReleaseConnectionRequest{ConnectionId: resp.ConnectionId},
+		&ReleaseConnectionResponse{},
+	)
 
-	if code != 200 {
-		t.Errorf("response code is not 200")
-	}
-
-	del_resp := Status{}
-	json.Unmarshal(body, &del_resp)
-
-	if del_resp.Status != "ok" {
-		t.Errorf("status != ok")
+	if err != nil {
+		t.Fatalf("rpc call returned an error: %s", err)
 	}
 }
 
 func TestAcquireWrongPort(t *testing.T) {
-	server := MakeServer()
+	StartTestServer()
+	defer StopTestServer()
 
-	handler := MakeHttpHandlerForServer(server)
-	code, body := GetResponse(handler, "POST", "/ports/wrong")
+	client := NewTestClient(t)
+	defer client.Close()
 
-	if code != 404 {
-		t.Errorf("response code is not 404")
-	}
+	req := &AcquireConnectionRequest{Name: "/ports/wrong"}
+	resp := &AcquireConnectionResponse{}
+	err := client.Call("RoombaServer.AcquireConnection", req, &resp)
 
-	resp := ErrorStatus{}
-	json.Unmarshal(body, &resp)
-
-	if resp.Status.Status == "ok" {
-		t.Errorf("status == ok")
+	if err == nil {
+		t.Errorf("acquiring wrong port name has not errored out")
 	}
 }
 
 func TestDeleteWrongConn(t *testing.T) {
-	server := MakeServer()
+	StartTestServer()
+	defer StopTestServer()
 
-	handler := MakeHttpHandlerForServer(server)
-	code, body := GetResponse(handler, "DELETE", "/connection/42")
+	client := NewTestClient(t)
+	defer client.Close()
 
-	if code != 404 {
-		t.Errorf("response code is not 404")
+	req := &ReleaseConnectionRequest{
+		ConnectionId: 42,
 	}
 
-	resp := ErrorStatus{}
-	json.Unmarshal(body, &resp)
+	err := client.Call("RoombaServer.ReleaseConnection", req, &ReleaseConnectionResponse{})
 
-	if resp.Status.Status == "ok" {
-		t.Errorf("status == ok")
+	if err == nil {
+		t.Errorf("releasing bad connection id has not errored out")
 	}
 }
