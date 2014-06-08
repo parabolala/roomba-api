@@ -17,15 +17,6 @@ type Port struct {
 	State string `json:"state"`
 }
 
-type Status struct {
-	Status string `json:"status"`
-}
-
-type ErrorStatus struct {
-	Status
-	Reason string `json:"reason"`
-}
-
 type Connection struct {
 	Id     uint64
 	Port   Port
