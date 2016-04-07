@@ -9,7 +9,7 @@ import (
 
 	"github.com/xa4a/roomba-api"
 
-	"code.google.com/p/go.net/websocket"
+	"golang.org/x/net/websocket"
 )
 
 func main() {
