@@ -5,25 +5,25 @@ import (
 )
 
 type SensorRequest struct {
-	ConnectionId uint64 `json:"connection_id"`
-	PacketId     byte   `json:"packet_id"`
+	Port     string `json:"port_name"`
+	PacketId byte   `json:"packet_id"`
 }
 type SensorResponse struct {
 	Value []byte `json:"value"`
 }
 
 type SensorListRequest struct {
-	ConnectionId uint64 `json:"connection_id"`
-	PacketIds    []byte `json:"packet_ids"`
+	Port      string `json:"port_name"`
+	PacketIds []byte `json:"packet_ids"`
 }
 type SensorListResponse struct {
 	Values [][]byte `json:"values"`
 }
 
 func (server RoombaServer) Sensor(req SensorRequest, resp *SensorResponse) error {
-	conn, ok := server.Connections[req.ConnectionId]
+	conn, ok := server.Connections[req.Port]
 	if !ok {
-		return fmt.Errorf("connection not found: %d", req.ConnectionId)
+		return fmt.Errorf("connection not found: %s", req.Port)
 	}
 
 	sensor_data, err := conn.Roomba.Sensors(req.PacketId)
@@ -37,9 +37,9 @@ func (server RoombaServer) Sensor(req SensorRequest, resp *SensorResponse) error
 }
 
 func (server RoombaServer) SensorList(req *SensorListRequest, resp *SensorListResponse) error {
-	conn, ok := server.Connections[req.ConnectionId]
+	conn, ok := server.Connections[req.Port]
 	if !ok {
-		return fmt.Errorf("connection not found: %d", req.ConnectionId)
+		return fmt.Errorf("connection not found: %s", req.Port)
 	}
 
 	sensor_data, err := conn.Roomba.QueryList(req.PacketIds)

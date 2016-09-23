@@ -11,15 +11,14 @@ type GetPortsResponse struct {
 }
 
 type AcquireConnectionRequest struct {
-	Name string `json:"name"`
+	Port string `json:"port_name"`
 }
 type AcquireConnectionResponse struct {
-	Name         string `json:"name"`
-	ConnectionId uint64 `json:"connection_id"`
+	Port string `json:"port_name"`
 }
 
 type ReleaseConnectionRequest struct {
-	ConnectionId uint64 `json:"connection_id"`
+	Port string `json:"port_name"`
 }
 type ReleaseConnectionResponse struct{}
 
@@ -28,25 +27,17 @@ func (server RoombaServer) GetPorts(req *GetPortsRequest, resp *GetPortsResponse
 	if err != nil {
 		return err
 	}
-	resp.Ports = append(resp.Ports, Port{DUMMY_PORT_NAME, PORT_STATE_AVAILABLE})
+	resp.Ports = append(resp.Ports, Port{DUMMY_PORT_NAME})
 	for _, port_filename := range all_ports {
 		log.Println("Found port " + port_filename)
 
-		_, in_use := server.PortsInUse[port_filename]
-		var state string
-		if in_use {
-			state = PORT_STATE_IN_USE
-		} else {
-			state = PORT_STATE_AVAILABLE
-		}
-
-		resp.Ports = append(resp.Ports, Port{port_filename, state})
+		resp.Ports = append(resp.Ports, Port{port_filename})
 	}
 	return nil
 }
 
 func (server RoombaServer) AcquireConnection(req *AcquireConnectionRequest, resp *AcquireConnectionResponse) error {
-	requested_port_name := req.Name
+	requested_port_name := req.Port
 	var found bool
 
 	if requested_port_name != DUMMY_PORT_NAME {
@@ -67,31 +58,23 @@ func (server RoombaServer) AcquireConnection(req *AcquireConnectionRequest, resp
 		}
 	}
 
-	// TODO: race condition here
-	_, ok := server.PortsInUse[requested_port_name]
-
-	if ok {
-		return fmt.Errorf("port is already in use: %s", requested_port_name)
-	}
-
-	conn_id, err := server.GetConnection(requested_port_name)
+	err := server.GetConnection(requested_port_name)
 
 	if err != nil {
 		return fmt.Errorf("failed getting a connection: %s", err.Error())
 	}
 
-	resp.Name = requested_port_name
-	resp.ConnectionId = conn_id
+	resp.Port = requested_port_name
 	return nil
 }
 
 func (server RoombaServer) ReleaseConnection(req *ReleaseConnectionRequest, resp *ReleaseConnectionResponse) error {
-	conn, ok := server.Connections[req.ConnectionId]
+	conn, ok := server.Connections[req.Port]
 	if !ok {
 		return fmt.Errorf("connection not found: %d", conn)
 	}
 
-	err := server.CloseConnection(conn.Id)
+	err := server.CloseConnection(conn.Port.Name)
 
 	if err != nil {
 		return err

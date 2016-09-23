@@ -43,7 +43,7 @@ func TestAcquireReleaseDummy(t *testing.T) {
 	defer client.Close()
 
 	req := &AcquireConnectionRequest{
-		Name: DUMMY_PORT_NAME,
+		Port: DUMMY_PORT_NAME,
 	}
 	resp := &AcquireConnectionResponse{}
 	err := client.Call("RoombaServer.AcquireConnection", req, &resp)
@@ -52,14 +52,14 @@ func TestAcquireReleaseDummy(t *testing.T) {
 		t.Fatalf("rpc call failed: %s", err)
 	}
 
-	if resp.Name != DUMMY_PORT_NAME {
+	if resp.Port != DUMMY_PORT_NAME {
 		t.Errorf("returned name (%s) != requested (%s)",
-			resp.Name, DUMMY_PORT_NAME)
+			resp.Port, DUMMY_PORT_NAME)
 	}
 
 	err = client.Call(
 		"RoombaServer.ReleaseConnection",
-		&ReleaseConnectionRequest{ConnectionId: resp.ConnectionId},
+		&ReleaseConnectionRequest{Port: resp.Port},
 		&ReleaseConnectionResponse{},
 	)
 
@@ -75,7 +75,7 @@ func TestAcquireWrongPort(t *testing.T) {
 	client := NewTestClient(t)
 	defer client.Close()
 
-	req := &AcquireConnectionRequest{Name: "/ports/wrong"}
+	req := &AcquireConnectionRequest{Port: "/ports/wrong"}
 	resp := &AcquireConnectionResponse{}
 	err := client.Call("RoombaServer.AcquireConnection", req, &resp)
 
@@ -92,7 +92,7 @@ func TestDeleteWrongConn(t *testing.T) {
 	defer client.Close()
 
 	req := &ReleaseConnectionRequest{
-		ConnectionId: 42,
+		Port: "foo",
 	}
 
 	err := client.Call("RoombaServer.ReleaseConnection", req, &ReleaseConnectionResponse{})

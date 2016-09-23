@@ -2,49 +2,36 @@ package roomba_api
 
 import (
 	"errors"
-	"fmt"
 	"log"
 
 	"github.com/xa4a/go-roomba"
 	rt "github.com/xa4a/go-roomba/testing"
 )
 
-const PORT_STATE_AVAILABLE string = "available"
-const PORT_STATE_IN_USE string = "in use"
-
 type Port struct {
-	Name  string `json:"name"`
-	State string `json:"state"`
+	Name string `json:"name"`
 }
 
 type Connection struct {
-	Id     uint64
-	Port   Port
-	Roomba *roomba.Roomba
+	Port       Port
+	Roomba     *roomba.Roomba
+	NumClients uint8
 }
 
 type RoombaServer struct {
-	Connections     map[uint64]Connection
+	Connections     map[string]Connection
 	connectionsChan chan ConnectionRequest
-
-	PortsInUse map[string]bool
-	nextConnId uint64
 }
 
 func (server *RoombaServer) acquireConnection(port_name string) (conn Connection, err error) {
-	_, ok := server.PortsInUse[port_name]
+	conn, ok := server.Connections[port_name]
 
 	if ok {
-		err = errors.New("port is already in use: " + port_name)
+		conn.NumClients += 1
 		return
 	}
 
-	if port_name != DUMMY_PORT_NAME {
-		server.PortsInUse[port_name] = true
-	}
-
-	conn.Id = server.nextConnId
-	server.nextConnId++
+	conn = Connection{NumClients: 1}
 	if port_name == DUMMY_PORT_NAME {
 		conn.Roomba = rt.MakeTestRoomba()
 	} else {
@@ -55,38 +42,45 @@ func (server *RoombaServer) acquireConnection(port_name string) (conn Connection
 	}
 	conn.Roomba.Start()
 	conn.Roomba.Safe()
-	conn.Port = Port{Name: port_name, State: PORT_STATE_IN_USE}
+	conn.Port = Port{Name: port_name}
 
-	server.Connections[conn.Id] = conn
+	server.Connections[port_name] = conn
 	return
 }
 
-func (server *RoombaServer) releaseConnection(conn_id uint64) error {
-	conn, ok := server.Connections[conn_id]
+func (server *RoombaServer) releaseConnection(port_name string) error {
+	conn, ok := server.Connections[port_name]
 
 	if !ok {
-		return errors.New("unknown connection: " + fmt.Sprintf("%d", conn_id))
+		return errors.New("unknown connection: " + port_name)
 	}
 
 	// close connection
 
-	delete(server.Connections, conn_id)
+	conn.NumClients -= 1
 
-	if conn.Port.Name != DUMMY_PORT_NAME {
-		delete(server.PortsInUse, conn.Port.Name)
+	if conn.NumClients == 0 {
+		delete(server.Connections, port_name)
 	}
 	return nil
 }
 
+type operation int
+
+const (
+	OPEN  operation = iota
+	CLOSE operation = iota
+)
+
 type ConnectionRequest struct {
-	PortName     string
-	ConnectionId uint64
-	C            chan<- ConnectionResponse
+	Port      string
+	Operation operation
+
+	C chan<- ConnectionResponse
 }
 
 type ConnectionResponse struct {
-	ConnectionId uint64
-	Error        error
+	Error error
 }
 
 func (server *RoombaServer) manageConnections() {
@@ -96,54 +90,51 @@ func (server *RoombaServer) manageConnections() {
 		resp = ConnectionResponse{}
 		select {
 		case req = <-server.connectionsChan:
-			if req.PortName != "" {
-				log.Printf("Acquiring connection to " + req.PortName)
-				conn, err := server.acquireConnection(req.PortName)
+			if req.Operation == OPEN {
+				log.Printf("Acquiring connection to " + req.Port)
+				_, err := server.acquireConnection(req.Port)
 				if err != nil {
-					log.Println("Acquiring connection to " + req.PortName +
+					log.Println("Acquiring connection to " + req.Port +
 						"failed: " + err.Error())
 
 					resp.Error = err
 				} else {
-					log.Printf("Acquiring connection to "+req.PortName+
-						" success: %d", conn.Id)
-					resp.ConnectionId = conn.Id
+					log.Printf("Acquiring connection to " + req.Port +
+						" success")
 				}
-			} else if req.ConnectionId != 0 {
-				log.Printf("Releasing connection %d", req.ConnectionId)
-				resp.Error = server.releaseConnection(req.ConnectionId)
+			} else if req.Operation == CLOSE {
+				log.Printf("Releasing connection %d", req.Port)
+				resp.Error = server.releaseConnection(req.Port)
 			} else {
 				resp.Error = errors.New(
-					"connectionrequest with neither PortName nor ConnectionId")
+					"connectionrequest with unknown operation")
 			}
 			req.C <- resp
 		}
 	}
 }
 
-func (server *RoombaServer) GetConnection(port_name string) (uint64, error) {
+func (server *RoombaServer) GetConnection(port_name string) error {
 	resp_chan := make(chan ConnectionResponse)
 	log.Printf("Requesting connection to %s", port_name)
-	req := ConnectionRequest{PortName: port_name, C: resp_chan}
+	req := ConnectionRequest{Port: port_name, Operation: OPEN, C: resp_chan}
 	server.connectionsChan <- req
 	resp := <-resp_chan
-	return resp.ConnectionId, resp.Error
+	return resp.Error
 }
 
-func (server *RoombaServer) CloseConnection(conn_id uint64) error {
+func (server *RoombaServer) CloseConnection(port_name string) error {
 	resp_chan := make(chan ConnectionResponse)
-	log.Printf("Closing connection %d", conn_id)
-	req := ConnectionRequest{ConnectionId: conn_id, C: resp_chan}
+	log.Printf("Closing connection %d", port_name)
+	req := ConnectionRequest{Port: port_name, Operation: CLOSE, C: resp_chan}
 	server.connectionsChan <- req
 	resp := <-resp_chan
 	return resp.Error
 }
 
 func MakeServer() (s RoombaServer) {
-	s.Connections = make(map[uint64]Connection)
+	s.Connections = make(map[string]Connection)
 	s.connectionsChan = make(chan ConnectionRequest)
-	s.PortsInUse = make(map[string]bool)
-	s.nextConnId = 1
 	go s.manageConnections()
 	return
 }

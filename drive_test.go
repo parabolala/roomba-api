@@ -14,7 +14,7 @@ func TestDriveOk(t *testing.T) {
 	client := NewTestClient(t)
 	defer client.Close()
 
-	conn_req := AcquireConnectionRequest{Name: DUMMY_PORT_NAME}
+	conn_req := AcquireConnectionRequest{Port: DUMMY_PORT_NAME}
 	conn_resp := AcquireConnectionResponse{}
 
 	err := client.Call("RoombaServer.AcquireConnection", conn_req, &conn_resp)
@@ -23,9 +23,9 @@ func TestDriveOk(t *testing.T) {
 		t.Fatalf("failed acquiring dummy connection: %s", err)
 	}
 
-	conn_id := conn_resp.ConnectionId
+	port_name := conn_resp.Port
 
-	drive_req := DriveRequest{conn_id, -200, 500}
+	drive_req := DriveRequest{port_name, -200, 500}
 	err = client.Call("RoombaServer.Drive", drive_req, &DriveResponse{})
 
 	if err != nil {
@@ -33,11 +33,11 @@ func TestDriveOk(t *testing.T) {
 	}
 
 	expected := []byte{128, 131, 137, 255, 56, 1, 244}
-	rt.VerifyWritten(testRoombaServer.Connections[conn_id].Roomba, expected, t)
+	rt.VerifyWritten(testRoombaServer.Connections[port_name].Roomba, expected, t)
 
 	// Special cases radius.
 	for _, radius := range []int16{-2000, 2000, 0, 10, -10, 32767, -32768} {
-		drive_req = DriveRequest{conn_id, -200, radius}
+		drive_req = DriveRequest{port_name, -200, radius}
 		err = client.Call("RoombaServer.Drive", drive_req, &DriveResponse{})
 
 		if err != nil {
@@ -53,7 +53,7 @@ func TestDriveWrongConnId(t *testing.T) {
 	client := NewTestClient(t)
 	defer client.Close()
 
-	drive_req := DriveRequest{42, -200, 500}
+	drive_req := DriveRequest{"foo", -200, 500}
 	err := client.Call("RoombaServer.Drive", drive_req, &DriveResponse{})
 
 	if err == nil {
@@ -69,7 +69,7 @@ func TestDriveWrongVelocityRadius(t *testing.T) {
 	client := NewTestClient(t)
 	defer client.Close()
 
-	conn_req := AcquireConnectionRequest{Name: DUMMY_PORT_NAME}
+	conn_req := AcquireConnectionRequest{Port: DUMMY_PORT_NAME}
 	conn_resp := AcquireConnectionResponse{}
 
 	err := client.Call("RoombaServer.AcquireConnection", conn_req, &conn_resp)
@@ -78,10 +78,10 @@ func TestDriveWrongVelocityRadius(t *testing.T) {
 		t.Fatalf("failed acquiring dummy connection: %s", err)
 	}
 
-	conn_id := conn_resp.ConnectionId
+	port_name := conn_resp.Port
 
 	for _, velocity := range []int16{-501, -1000, 501, 1001} {
-		drive_req := DriveRequest{conn_id, velocity, 500}
+		drive_req := DriveRequest{port_name, velocity, 500}
 		err = client.Call("RoombaServer.Drive", drive_req, &DriveResponse{})
 
 		if err == nil {
@@ -90,7 +90,7 @@ func TestDriveWrongVelocityRadius(t *testing.T) {
 	}
 
 	for _, radius := range []int16{-2001, -10000, 2001, 10000} {
-		drive_req := DriveRequest{conn_id, 315, radius}
+		drive_req := DriveRequest{port_name, 315, radius}
 		err = client.Call("RoombaServer.Drive", drive_req, &DriveResponse{})
 
 		if err == nil {
@@ -107,7 +107,7 @@ func TestDirectDriveOk(t *testing.T) {
 	client := NewTestClient(t)
 	defer client.Close()
 
-	conn_req := AcquireConnectionRequest{Name: DUMMY_PORT_NAME}
+	conn_req := AcquireConnectionRequest{Port: DUMMY_PORT_NAME}
 	conn_resp := AcquireConnectionResponse{}
 
 	err := client.Call("RoombaServer.AcquireConnection", conn_req, &conn_resp)
@@ -116,9 +116,9 @@ func TestDirectDriveOk(t *testing.T) {
 		t.Errorf("failed acquiring dummy connection: %s", err)
 	}
 
-	conn_id := conn_resp.ConnectionId
+	port_name := conn_resp.Port
 
-	drive_req := DirectDriveRequest{conn_id, 127, 256}
+	drive_req := DirectDriveRequest{port_name, 127, 256}
 	err = client.Call("RoombaServer.DirectDrive", drive_req, &DirectDriveResponse{})
 
 	if err != nil {
@@ -126,7 +126,7 @@ func TestDirectDriveOk(t *testing.T) {
 	}
 
 	expected := []byte{128, 131, 145, 0, 127, 1, 0}
-	rt.VerifyWritten(testRoombaServer.Connections[conn_id].Roomba, expected, t)
+	rt.VerifyWritten(testRoombaServer.Connections[port_name].Roomba, expected, t)
 }
 
 func TestDirectDriveWrongConnId(t *testing.T) {
@@ -136,7 +136,7 @@ func TestDirectDriveWrongConnId(t *testing.T) {
 	client := NewTestClient(t)
 	defer client.Close()
 
-	drive_req := DirectDriveRequest{42, 127, 256}
+	drive_req := DirectDriveRequest{"foo", 127, 256}
 	err := client.Call("RoombaServer.DirectDrive", drive_req, &DirectDriveResponse{})
 
 	if err == nil {
@@ -152,7 +152,7 @@ func TestDirectDriveWrongVelocity(t *testing.T) {
 	client := NewTestClient(t)
 	defer client.Close()
 
-	conn_req := AcquireConnectionRequest{Name: DUMMY_PORT_NAME}
+	conn_req := AcquireConnectionRequest{Port: DUMMY_PORT_NAME}
 	conn_resp := AcquireConnectionResponse{}
 
 	err := client.Call("RoombaServer.AcquireConnection", conn_req, &conn_resp)
@@ -161,14 +161,14 @@ func TestDirectDriveWrongVelocity(t *testing.T) {
 		t.Fatalf("failed acquiring dummy connection: %s", err)
 	}
 
-	conn_id := conn_resp.ConnectionId
+	port_name := conn_resp.Port
 	for _, velocities := range [][2]int16{{-501, 500},
 		{-1000, 501},
 		{35, 1002}} {
 		left := velocities[0]
 		right := velocities[1]
 
-		drive_req := DirectDriveRequest{conn_id, left, right}
+		drive_req := DirectDriveRequest{port_name, left, right}
 		err = client.Call("RoombaServer.DirectDrive", drive_req, &DirectDriveResponse{})
 
 		if err == nil {

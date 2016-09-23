@@ -16,7 +16,7 @@ func TestSensorOk(t *testing.T) {
 	client := NewTestClient(t)
 	defer client.Close()
 
-	conn_req := AcquireConnectionRequest{Name: DUMMY_PORT_NAME}
+	conn_req := AcquireConnectionRequest{Port: DUMMY_PORT_NAME}
 	conn_resp := AcquireConnectionResponse{}
 
 	err := client.Call("RoombaServer.AcquireConnection", conn_req, &conn_resp)
@@ -25,13 +25,13 @@ func TestSensorOk(t *testing.T) {
 		t.Fatalf("failed acquiring dummy connection: %s", err)
 	}
 
-	conn_id := conn_resp.ConnectionId
+	port_name := conn_resp.Port
 
 	output := sim.MockSensorValues[constants.SENSOR_CLIFF_RIGHT]
 
 	s_req := SensorRequest{
-		ConnectionId: conn_id,
-		PacketId:     constants.SENSOR_CLIFF_RIGHT,
+		Port:     port_name,
+		PacketId: constants.SENSOR_CLIFF_RIGHT,
 	}
 	resp := &SensorResponse{}
 	err = client.Call("RoombaServer.Sensor", s_req, resp)
@@ -53,7 +53,7 @@ func TestBadSensorPacketId(t *testing.T) {
 	client := NewTestClient(t)
 	defer client.Close()
 
-	conn_req := AcquireConnectionRequest{Name: DUMMY_PORT_NAME}
+	conn_req := AcquireConnectionRequest{Port: DUMMY_PORT_NAME}
 	conn_resp := AcquireConnectionResponse{}
 
 	err := client.Call("RoombaServer.AcquireConnection", conn_req, &conn_resp)
@@ -62,9 +62,9 @@ func TestBadSensorPacketId(t *testing.T) {
 		t.Fatalf("failed acquiring dummy connection: %s", err)
 	}
 
-	conn_id := conn_resp.ConnectionId
+	port_name := conn_resp.Port
 
-	s_req := SensorRequest{ConnectionId: conn_id, PacketId: 250}
+	s_req := SensorRequest{Port: port_name, PacketId: 250}
 	s_resp := &SensorResponse{}
 	err = client.Call("RoombaServer.Sensor", s_req, s_resp)
 
@@ -80,7 +80,7 @@ func TestBadSensorConnId(t *testing.T) {
 	client := NewTestClient(t)
 	defer client.Close()
 
-	s_req := SensorRequest{ConnectionId: 42, PacketId: 250}
+	s_req := SensorRequest{Port: "foo", PacketId: 250}
 	s_resp := &SensorResponse{}
 	err := client.Call("RoombaServer.Sensor", s_req, s_resp)
 
@@ -97,7 +97,7 @@ func TestSensorList(t *testing.T) {
 	client := NewTestClient(t)
 	defer client.Close()
 
-	conn_req := AcquireConnectionRequest{Name: DUMMY_PORT_NAME}
+	conn_req := AcquireConnectionRequest{Port: DUMMY_PORT_NAME}
 	conn_resp := AcquireConnectionResponse{}
 
 	err := client.Call("RoombaServer.AcquireConnection", conn_req, &conn_resp)
@@ -106,7 +106,7 @@ func TestSensorList(t *testing.T) {
 		t.Fatalf("failed acquiring dummy connection: %s", err)
 	}
 
-	conn_id := conn_resp.ConnectionId
+	port_name := conn_resp.Port
 
 	requested_sensors := []byte{
 		constants.SENSOR_DISTANCE,
@@ -118,8 +118,8 @@ func TestSensorList(t *testing.T) {
 	}
 
 	s_req := SensorListRequest{
-		ConnectionId: conn_id,
-		PacketIds:    requested_sensors,
+		Port:      port_name,
+		PacketIds: requested_sensors,
 	}
 	resp := &SensorListResponse{}
 
@@ -156,8 +156,8 @@ func TestSensorListBadConnId(t *testing.T) {
 	}
 
 	s_req := SensorListRequest{
-		ConnectionId: 42,
-		PacketIds:    requested_sensors,
+		Port:      "foo",
+		PacketIds: requested_sensors,
 	}
 	resp := &SensorListResponse{}
 
